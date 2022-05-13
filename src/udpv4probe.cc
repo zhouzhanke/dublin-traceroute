@@ -25,10 +25,10 @@
 #include "dublintraceroute/exceptions.h"
 #include "dublintraceroute/icmp_messages.h"
 
-
 /** \brief method that sends the probe to the specified destination
  */
-Tins::IP* UDPv4Probe::forge() {
+Tins::IP *UDPv4Probe::forge()
+{
 	/* The payload is used to manipulate the UDP checksum, that will be
 	 * used as hop identifier.
 	 * The last two bytes will be adjusted to influence the hop identifier,
@@ -44,8 +44,8 @@ Tins::IP* UDPv4Probe::forge() {
 	payload[5] = ((unsigned char *)&identifier)[0];
 	payload[6] = ((unsigned char *)&identifier)[1];
 	Tins::IP *packet = new Tins::IP(remote_addr_, local_addr_) /
-		Tins::UDP(remote_port_, local_port_) /
-		Tins::RawPDU((char *)payload);
+					   Tins::UDP(remote_port_, local_port_) /
+					   Tins::RawPDU((char *)payload);
 	packet->ttl(ttl_);
 	packet->flags(Tins::IP::DONT_FRAGMENT);
 
@@ -56,18 +56,20 @@ Tins::IP* UDPv4Probe::forge() {
 	return packet;
 }
 
-Tins::IP &UDPv4Probe::send() {
+Tins::IP &UDPv4Probe::send()
+{
 	Tins::NetworkInterface iface = Tins::NetworkInterface::default_interface();
 	Tins::PacketSender sender;
-	if (packet == nullptr) {
+	if (packet == nullptr)
+	{
 		packet = forge();
 	}
 	sender.send(*packet, iface.name());
 	return *packet;
 }
 
-UDPv4Probe::~UDPv4Probe() {
+UDPv4Probe::~UDPv4Probe()
+{
 	if (packet != nullptr)
 		delete packet;
 }
-

@@ -40,32 +40,34 @@ extern int errno;
  * https://libtins.github.io
  */
 
+#define SNIFFER_TIMEOUT_MS 2000
 
-#define SNIFFER_TIMEOUT_MS	2000
-
-
-Tins::Timestamp extract_timestamp_from_msg(struct msghdr &msg) {
+Tins::Timestamp extract_timestamp_from_msg(struct msghdr &msg)
+{
 	int level, type;
 	struct cmsghdr *cm;
 	struct timeval *tvp = NULL,
-			tv,
-			now;
+				   tv,
+				   now;
 	// if there's no timestamp in the control message, fall back to
 	// gettimeofday, and get it early in this function
-	if (gettimeofday(&now, NULL) == -1) {
+	if (gettimeofday(&now, NULL) == -1)
+	{
 		std::cerr << strerror(errno) << std::endl;
 		return Tins::Timestamp();
 	}
 	for (cm = CMSG_FIRSTHDR(&msg); cm != NULL; cm = CMSG_NXTHDR(&msg, cm))
 	{
 		level = cm->cmsg_level;
-		type  = cm->cmsg_type;
-		if (SOL_SOCKET == level && SO_TIMESTAMP == type) {
-			tvp = (struct timeval *) CMSG_DATA(cm);
+		type = cm->cmsg_type;
+		if (SOL_SOCKET == level && SO_TIMESTAMP == type)
+		{
+			tvp = (struct timeval *)CMSG_DATA(cm);
 			break;
 		}
 	}
-	if (tvp != NULL) {
+	if (tvp != NULL)
+	{
 		tv.tv_sec = tvp->tv_sec;
 		tv.tv_usec = tvp->tv_usec;
 		return Tins::Timestamp(tv);
@@ -82,25 +84,28 @@ Tins::Timestamp extract_timestamp_from_msg(struct msghdr &msg) {
  *
  * \return none
  */
-const void DublinTraceroute::validate_arguments() {
+const void DublinTraceroute::validate_arguments()
+{
 	// it is not necessary to validate srcport, dstport, npaths and
 	// broken_nat, as they are already constrained by their types.
 	// Similarly for min_ttl and max_ttl, but the latter must be greater or
 	// equal than the former.
-	if (min_ttl_ > max_ttl_) {
+	if (min_ttl_ > max_ttl_)
+	{
 		throw std::invalid_argument(
 			"max-ttl must be greater or equal than min-ttl");
 	}
-	if (delay_ > 1000) {
+	if (delay_ > 1000)
+	{
 		throw std::invalid_argument(
 			"delay must be between 0 and 1000 milliseconds");
 	}
-	if (type_ <= probe_type::min || type_ >= probe_type::max) {
+	if (type_ <= probe_type::min || type_ >= probe_type::max)
+	{
 		throw std::invalid_argument(
 			"invalid probe type");
 	}
 }
-
 
 /** \brief run the multipath traceroute
  *
@@ -111,7 +116,8 @@ const void DublinTraceroute::validate_arguments() {
  * \sa TracerouteResults
  * \returns an instance of TracerouteResults
  */
-std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
+std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute()
+{
 	// avoid running multiple traceroutes
 	if (mutex_tracerouting.try_lock() == false)
 		throw DublinTracerouteInProgressException("Traceroute already in progress");
@@ -119,36 +125,41 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 	validate_arguments();
 
 	// Resolve the target host
-	try {
+	try
+	{
 		target(Tins::Utils::resolve_domain(dst()));
-	} catch (std::runtime_error) {
+	}
+	catch (std::runtime_error)
+	{
 		target(Tins::IPv4Address(dst()));
 	}
 
 	uint16_t num_packets = (max_ttl() - min_ttl() + 1) * npaths();
-	std::chrono::steady_clock::time_point deadline = \
-		std::chrono::steady_clock::now() + \
-		std::chrono::milliseconds(SNIFFER_TIMEOUT_MS) + \
+	std::chrono::steady_clock::time_point deadline =
+		std::chrono::steady_clock::now() +
+		std::chrono::milliseconds(SNIFFER_TIMEOUT_MS) +
 		std::chrono::milliseconds(delay() * num_packets);
 	// configure the sniffing handler
 	auto handler = std::bind(
 		&DublinTraceroute::sniffer_callback,
 		this,
-		std::placeholders::_1
-	);
+		std::placeholders::_1);
 
 	// start the ICMP listener
 	int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-	if (sock == -1) {
+	if (sock == -1)
+	{
 		throw std::runtime_error(strerror(errno));
 	}
 	int ts_flag = 1;
 	int ret;
-	if ((ret = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMP, (int *)&ts_flag, sizeof(ts_flag))) == -1) {
+	if ((ret = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMP, (int *)&ts_flag, sizeof(ts_flag))) == -1)
+	{
 		throw std::runtime_error(strerror(errno));
 	}
 	std::thread listener_thread(
-		[&]() {
+		[&]()
+		{
 			size_t received;
 			char buf[512];
 			struct msghdr msg;
@@ -161,23 +172,35 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 			struct csmghdr *cmsg;
 			msg.msg_control = cmsg;
 			msg.msg_controllen = 0;
-			while (std::chrono::steady_clock::now() <= deadline) {
+			while (std::chrono::steady_clock::now() <= deadline)
+			{
 				received = recvmsg(sock, &msg, MSG_DONTWAIT);
-				if (received == -1) {
-					if (errno != EAGAIN && errno != EWOULDBLOCK) {
+				if (received == -1)
+				{
+					if (errno != EAGAIN && errno != EWOULDBLOCK)
+					{
 						std::cerr << strerror(errno) << std::endl;
 					}
-				} else if (msg.msg_flags & MSG_TRUNC) {
+				}
+				else if (msg.msg_flags & MSG_TRUNC)
+				{
 					std::cerr << "Warning: received datagram too large for buffer" << std::endl;
-				} else if (received < 20) {
+				}
+				else if (received < 20)
+				{
 					std::cerr << "Warning: short read, less than 20 bytes" << std::endl;
-				} else if (buf[0] >> 4 == 4) {
+				}
+				else if (buf[0] >> 4 == 4)
+				{
 					// is it IP version 4? Then enqueue it
 					// for processing
 					Tins::IP *ip;
-					try {
+					try
+					{
 						ip = new Tins::IP((const uint8_t *)buf, received);
-					} catch (Tins::malformed_packet&) {
+					}
+					catch (Tins::malformed_packet &)
+					{
 						std::cerr << "Warning: malformed packet" << std::endl;
 						continue;
 					}
@@ -191,17 +214,18 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 				std::this_thread::sleep_for(std::chrono::milliseconds(5));
 			}
 			close(sock);
-		}
-	);
+		});
 
 	std::shared_ptr<flow_map_t> flows(new flow_map_t);
 
 	uint16_t iterated_port = dstport();
-	if(use_srcport_for_path_generation()) iterated_port = srcport();
+	if (use_srcport_for_path_generation())
+		iterated_port = srcport();
 	uint16_t end_port = iterated_port + npaths();
 
 	// forge the packets to send
-	for (iterated_port; iterated_port < end_port; iterated_port++) {
+	for (iterated_port; iterated_port < end_port; iterated_port++)
+	{
 		/* Forge the packets to send and append them to the packets
 		 * vector.
 		 * To force a packet through the same network flow, it has to
@@ -216,36 +240,45 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 		 *   UDP.dport
 		 */
 		Hops hops;
-		for (uint8_t ttl = min_ttl_; ttl <= max_ttl_; ttl++) {
+		for (uint8_t ttl = min_ttl_; ttl <= max_ttl_; ttl++)
+		{
 			/*
-		 	 * Adjust the payload for each flow to obtain the same UDP
-		 	 * checksum. The UDP checksum is used to identify the flow.
-		 	 */
-			
+			 * Adjust the payload for each flow to obtain the same UDP
+			 * checksum. The UDP checksum is used to identify the flow.
+			 */
+
 			UDPv4Probe *probe = NULL;
-			if(use_srcport_for_path_generation()){
+			if (use_srcport_for_path_generation())
+			{
 				probe = new UDPv4Probe(target(), dstport(), iterated_port, ttl);
 			}
-			else{
+			else
+			{
 				probe = new UDPv4Probe(target(), iterated_port, srcport(), ttl);
-				//UDPv4Probe probe(target(), dport, srcport(), ttl);	
+				// UDPv4Probe probe(target(), dport, srcport(), ttl);
 			}
 			Tins::IP *packet;
-			try {
+			try
+			{
 				packet = &probe->send();
-			} catch (std::runtime_error &e) {
+			}
+			catch (std::runtime_error &e)
+			{
 				std::stringstream ss;
 				ss << "Cannot send packet: " << e.what();
 				throw DublinTracerouteException(ss.str());
 			}
 			auto now = Tins::Timestamp::current_time();
 
-			try {
+			try
+			{
 				Hop hop;
 				hop.sent(*packet);
 				hop.sent_timestamp(now);
 				hops.push_back(hop);
-			} catch (std::runtime_error e) {
+			}
+			catch (std::runtime_error e)
+			{
 				std::stringstream ss;
 				ss << "Cannot find flow: " << iterated_port << ": " << e.what();
 				throw DublinTracerouteException(ss.str());
@@ -260,7 +293,8 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 	TracerouteResults *results = new TracerouteResults(flows, min_ttl_, broken_nat(), use_srcport_for_path_generation());
 
 	match_sniffed_packets(*results);
-	if (!no_dns()) {
+	if (!no_dns())
+	{
 		match_hostnames(*results, flows);
 	}
 
@@ -269,29 +303,29 @@ std::shared_ptr<TracerouteResults> DublinTraceroute::traceroute() {
 	return std::make_shared<TracerouteResults>(*results);
 }
 
-
-bool DublinTraceroute::sniffer_callback(Tins::Packet &packet) {
+bool DublinTraceroute::sniffer_callback(Tins::Packet &packet)
+{
 	std::lock_guard<std::mutex> lock(mutex_sniffed_packets);
 	sniffed_packets.push_back(std::make_shared<Tins::Packet>(packet));
 	return true;
 }
 
-
-void DublinTraceroute::match_sniffed_packets(TracerouteResults &results) {
-	for (auto &packet: sniffed_packets)
+void DublinTraceroute::match_sniffed_packets(TracerouteResults &results)
+{
+	for (auto &packet : sniffed_packets)
 		results.match_packet(*packet);
 }
 
-
-void DublinTraceroute::match_hostnames(TracerouteResults &results, std::shared_ptr<flow_map_t> flows) {
+void DublinTraceroute::match_hostnames(TracerouteResults &results, std::shared_ptr<flow_map_t> flows)
+{
 	// TODO make this asynchronous
 	// TODO move this to a proxy method ::resolve() in TracerouteResults
-	for (auto &iter: *flows) {
+	for (auto &iter : *flows)
+	{
 		auto packets = iter.second;
-		for (auto &hop: *packets) {
+		for (auto &hop : *packets)
+		{
 			hop.resolve();
 		}
 	}
 }
-
-

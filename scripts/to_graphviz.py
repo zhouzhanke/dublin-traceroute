@@ -33,7 +33,7 @@ def json_to_graphviz(traceroute, no_rtt=False):
 
     # create a dummy first node to add the source host to the graph
     # FIXME this approach sucks
-    for flow, hops in traceroute['flows'].iteritems():
+    for flow, hops in traceroute['flows'].items():
         src_ip = hops[0]['sent']['ip']['src']
         firsthop = {}
         hops = [firsthop] + hops
@@ -106,7 +106,7 @@ def main():
     args = parse_args()
     traceroute = json.load(args.jsonfile)
     graph = json_to_graphviz(traceroute, args.no_rtt)
-    print graph
+    print(graph)
     graph.layout('dot')
 
     # Save to DOT
@@ -119,6 +119,7 @@ def main():
     pngfile = '{name}.png'.format(name=args.jsonfile.name)
     graph.draw(pngfile)
     print('Graph saved to {f}'.format(f=pngfile))
+
 
 if __name__ == '__main__':
     main()

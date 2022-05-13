@@ -35,10 +35,10 @@ const struct option longopts[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static void usage() {
-	std::cerr <<
-"Dublin Traceroute v" VERSION "\n"
-R"(Written by Andrea Barberio - https://insomniac.slackware.it
+static void usage()
+{
+	std::cerr << "Dublin Traceroute v" VERSION "\n"
+				 R"(Written by Andrea Barberio - https://insomniac.slackware.it
 
 Usage:
    )" PROGNAME R"(<target> [--sport=src_base_port]
@@ -57,12 +57,18 @@ Usage:
 Options:
   -h --help                     this help
   -v --version                  print the version of Dublin Traceroute
-  -s SRC_PORT --sport=SRC_PORT  the source port to send packets from (default: )" << DublinTraceroute::default_srcport << R"()
-  -d DST_PORT --dport=DST_PORT  the base destination port to send packets to (default: )" << DublinTraceroute::default_dstport << R"()
-  -n NPATHS --npaths=NPATHS     the number of paths to probe (default: )" << static_cast<int>(DublinTraceroute::default_npaths) << R"()
-  -t MIN_TTL --min-ttl=MIN_TTL  the minimum TTL to probe (default: )" << static_cast<int>(DublinTraceroute::default_min_ttl) << R"()
-  -T MAX_TTL --max-ttl=MAX_TTL  the maximum TTL to probe. Must be greater or equal than the minimum TTL (default: )" << static_cast<int>(DublinTraceroute::default_max_ttl) << R"()
-  -D DELAY --delay=DELAY        the inter-packet delay in milliseconds (default: )" << DublinTraceroute::default_delay << R"()
+  -s SRC_PORT --sport=SRC_PORT  the source port to send packets from (default: )"
+			  << DublinTraceroute::default_srcport << R"()
+  -d DST_PORT --dport=DST_PORT  the base destination port to send packets to (default: )"
+			  << DublinTraceroute::default_dstport << R"()
+  -n NPATHS --npaths=NPATHS     the number of paths to probe (default: )"
+			  << static_cast<int>(DublinTraceroute::default_npaths) << R"()
+  -t MIN_TTL --min-ttl=MIN_TTL  the minimum TTL to probe (default: )"
+			  << static_cast<int>(DublinTraceroute::default_min_ttl) << R"()
+  -T MAX_TTL --max-ttl=MAX_TTL  the maximum TTL to probe. Must be greater or equal than the minimum TTL (default: )"
+			  << static_cast<int>(DublinTraceroute::default_max_ttl) << R"()
+  -D DELAY --delay=DELAY        the inter-packet delay in milliseconds (default: )"
+			  << DublinTraceroute::default_delay << R"()
   -b --broken-nat               the network has a broken NAT configuration (e.g. no payload fixup). Try this if you see fewer hops than expected
   -i --use-srcport              generate paths using source port instead of destination port
   -N --no-dns                   do not attempt to do reverse DNS lookup of the hops
@@ -75,174 +81,191 @@ Additional features in the Python module at https://github.com/insomniacslk/pyth
 )";
 }
 
-
-int
-main(int argc, char **argv) {
-	std::string	target;
+int main(int argc, char **argv)
+{
+	std::string target;
 	probe_type type = DublinTraceroute::default_type;
-	long	sport = DublinTraceroute::default_srcport;
-	long	dport = DublinTraceroute::default_dstport;
-	long	npaths = DublinTraceroute::default_npaths;
-	long	min_ttl = DublinTraceroute::default_min_ttl;
-	long	max_ttl = DublinTraceroute::default_max_ttl;
-	long	delay = DublinTraceroute::default_delay;
-	bool	broken_nat = DublinTraceroute::default_broken_nat;
-	bool	use_srcport_for_path_generation = DublinTraceroute::default_use_srcport_for_path_generation;
-	bool	no_dns = DublinTraceroute::default_no_dns;
-	std::string	output_file = "";
+	long sport = DublinTraceroute::default_srcport;
+	long dport = DublinTraceroute::default_dstport;
+	long npaths = DublinTraceroute::default_npaths;
+	long min_ttl = DublinTraceroute::default_min_ttl;
+	long max_ttl = DublinTraceroute::default_max_ttl;
+	long delay = DublinTraceroute::default_delay;
+	bool broken_nat = DublinTraceroute::default_broken_nat;
+	bool use_srcport_for_path_generation = DublinTraceroute::default_use_srcport_for_path_generation;
+	bool no_dns = DublinTraceroute::default_no_dns;
+	std::string output_file = "";
 
-	if (geteuid() == 0) {
+	if (geteuid() == 0)
+	{
 		std::cerr
 			<< "WARNING: you are running this program as root. Consider setting the CAP_NET_RAW " << std::endl
 			<< "         capability and running as non-root user as a more secure alternative." << std::endl;
 	}
 
-	int	 index,
-		 iarg = 0;
+	int index,
+		iarg = 0;
 
-	#define TO_LONG(name, value) {								\
-			try {									\
-				name = std::stol(value);					\
-			} catch (std::invalid_argument) {					\
-				std::cerr << "Invalid argument. See --help" << std::endl;	\
-				std::exit(EXIT_FAILURE);					\
-			}									\
-		}
-	while ((iarg = getopt_long(argc, argv, shortopts, longopts, &index)) != -1) {
-		switch (iarg) {
-			case 'h':
-				usage();
-				std::exit(EXIT_SUCCESS);
-			case 'v':
-				std::cerr << "Dublin Traceroute " << VERSION << std::endl;
-				std::exit(EXIT_SUCCESS);
-			case 's':
-				TO_LONG(sport, optarg);
-				break;
-			case 'd':
-				TO_LONG(dport, optarg);
-				break;
-			case 'n':
-				TO_LONG(npaths, optarg);
-				break;
-			case 't':
-				TO_LONG(min_ttl, optarg);
-				break;
-			case 'T':
-				TO_LONG(max_ttl, optarg);
-				break;
-			case 'D':
-				TO_LONG(delay, optarg);
-				break;
-			case 'b':
-				broken_nat = true;
-				break;
-			case 'i':
-				use_srcport_for_path_generation = true;
-				break;
-			case 'N':
-				no_dns = true;
-				break;
-			case 'o':
-				output_file.assign(optarg);
-				break;
-			default:
-				std::cerr << "Invalid argument: " << iarg << ". See --help" << std::endl;
-				std::exit(EXIT_FAILURE);
+#define TO_LONG(name, value)                                          \
+	{                                                                 \
+		try                                                           \
+		{                                                             \
+			name = std::stol(value);                                  \
+		}                                                             \
+		catch (std::invalid_argument)                                 \
+		{                                                             \
+			std::cerr << "Invalid argument. See --help" << std::endl; \
+			std::exit(EXIT_FAILURE);                                  \
+		}                                                             \
+	}
+	while ((iarg = getopt_long(argc, argv, shortopts, longopts, &index)) != -1)
+	{
+		switch (iarg)
+		{
+		case 'h':
+			usage();
+			std::exit(EXIT_SUCCESS);
+		case 'v':
+			std::cerr << "Dublin Traceroute " << VERSION << std::endl;
+			std::exit(EXIT_SUCCESS);
+		case 's':
+			TO_LONG(sport, optarg);
+			break;
+		case 'd':
+			TO_LONG(dport, optarg);
+			break;
+		case 'n':
+			TO_LONG(npaths, optarg);
+			break;
+		case 't':
+			TO_LONG(min_ttl, optarg);
+			break;
+		case 'T':
+			TO_LONG(max_ttl, optarg);
+			break;
+		case 'D':
+			TO_LONG(delay, optarg);
+			break;
+		case 'b':
+			broken_nat = true;
+			break;
+		case 'i':
+			use_srcport_for_path_generation = true;
+			break;
+		case 'N':
+			no_dns = true;
+			break;
+		case 'o':
+			output_file.assign(optarg);
+			break;
+		default:
+			std::cerr << "Invalid argument: " << iarg << ". See --help" << std::endl;
+			std::exit(EXIT_FAILURE);
 		}
 	}
-	#undef TO_LONG
-	if (optind == argc) {
+#undef TO_LONG
+	if (optind == argc)
+	{
 		std::cerr << "Target is required. See --help" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (optind + 1 < argc) {
+	if (optind + 1 < argc)
+	{
 		std::cerr << "Exactly one target is required. See --help" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
 	target = argv[optind];
 
-	if (sport < 1 || sport > 65535) {
+	if (sport < 1 || sport > 65535)
+	{
 		std::cerr << "Source port must be between 1 and 65535" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	
-	if (dport < 1 || dport > 65535) {
+
+	if (dport < 1 || dport > 65535)
+	{
 		std::cerr << "Destination port must be between 1 and 65535" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (npaths < 1 || npaths > 65535) {
+	if (npaths < 1 || npaths > 65535)
+	{
 		std::cerr << "Number of paths must be between 1 and 65535" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (min_ttl < 1 || min_ttl > 255) {
+	if (min_ttl < 1 || min_ttl > 255)
+	{
 		std::cerr << "Min TTL must be between 1 and 255" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (max_ttl < 1 || max_ttl > 255) {
+	if (max_ttl < 1 || max_ttl > 255)
+	{
 		std::cerr << "Max TTL must be between 1 and 255" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (min_ttl > max_ttl) {
+	if (min_ttl > max_ttl)
+	{
 		std::cerr << "Min TTL must be smaller or equal than max TTL" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	if (use_srcport_for_path_generation) {
-		if (sport + npaths - 1 > 65535) {
+	if (use_srcport_for_path_generation)
+	{
+		if (sport + npaths - 1 > 65535)
+		{
 			std::cerr << "Source port + number of paths must not exceed 65535" << std::endl;
 			std::exit(EXIT_FAILURE);
 		}
-	} else {
-		if (dport + npaths - 1 > 65535) {
+	}
+	else
+	{
+		if (dport + npaths - 1 > 65535)
+		{
 			std::cerr << "Destination port + number of paths must not exceed 65535" << std::endl;
 			std::exit(EXIT_FAILURE);
 		}
 	}
-	if (delay < 0 || delay > 1000) {
+	if (delay < 0 || delay > 1000)
+	{
 		std::cerr << "The inter-packet delay must be a number between 0 and 1000 milliseconds" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
 
 	std::cerr << "Starting " PROGNAME " (probe type: " << probe_type_name(type) << ")" << std::endl;
 
-	DublinTraceroute Dublin(
-			target,
-			type,
-			sport,
-			dport,
-			npaths,
-			min_ttl,
-			max_ttl,
-			delay,
-			broken_nat,
-			use_srcport_for_path_generation,
-			no_dns
-	);
-	
+	DublinTraceroute Dublin(target, type, sport, dport, npaths, min_ttl, max_ttl, delay, broken_nat, use_srcport_for_path_generation, no_dns);
+
+	// should get local IP interface, not 0.0.0.0
 	std::cerr << "Traceroute from 0.0.0.0:" << Dublin.srcport();
-	if(use_srcport_for_path_generation == 1){
+	if (use_srcport_for_path_generation == 1)
+	{
 		std::cerr << "~" << (Dublin.srcport() + npaths - 1);
 	}
-	
+
 	std::cerr << " to " << Dublin.dst() << ":" << Dublin.dstport();
-	if(use_srcport_for_path_generation == 0){
+	if (use_srcport_for_path_generation == 0)
+	{
 		std::cerr << "~" << (Dublin.dstport() + npaths - 1);
 	}
-	
+
 	std::cerr << " (probing " << npaths << " path" << (npaths == 1 ? "" : "s")
-		<< ", min TTL is " << min_ttl
-		<< ", max TTL is " << max_ttl
-		<< ", delay is " << delay << " ms"
-		<< ")"
-		<< std::endl;
+			  << ", min TTL is " << min_ttl
+			  << ", max TTL is " << max_ttl
+			  << ", delay is " << delay << " ms"
+			  << ")"
+			  << std::endl;
 
 	std::shared_ptr<TracerouteResults> results;
-	try {
+	// start probing
+	try
+	{
 		results = Dublin.traceroute();
-	} catch (DublinTracerouteException &e) {
+	}
+	catch (DublinTracerouteException &e)
+	{
 		std::cerr << "Failed: " << e.what() << std::endl;
 		std::exit(EXIT_FAILURE);
-	} catch (std::runtime_error &e) {
+	}
+	catch (std::runtime_error &e)
+	{
 		std::cerr << "Failed: " << e.what() << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
@@ -252,19 +275,22 @@ main(int argc, char **argv) {
 	// Save as JSON
 	std::streambuf *buf;
 	std::ofstream of;
-	if (output_file == "") {
+	if (output_file == "")
+	{
 		buf = std::cout.rdbuf();
-	} else {
+	}
+	else
+	{
 		of.open(output_file);
 		buf = of.rdbuf();
 	}
 	std::ostream jsonfile(buf);
 	jsonfile << results->to_json() << std::endl;
-	if (output_file != "") {
+	if (output_file != "")
+	{
 		std::cerr << "Saved JSON file to " << output_file << " ." << std::endl;
 		std::cerr << "You can convert it to DOT by running python3 -m dublintraceroute plot " << output_file << std::endl;
 	}
 
 	std::exit(EXIT_SUCCESS);
 }
-
